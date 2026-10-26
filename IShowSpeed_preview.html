@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IShowSpeed · Automata-Based Time Complexity Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#000040;
+    --cream:#E8E8B7;
+    --surface:color-mix(in srgb,#E8E8B7 45%,#ffffff);   /* lifted cream for cards */
+    --panel:color-mix(in srgb,#E8E8B7 80%,#000040 6%);   /* recessed cream, like the grey feature area */
+    --muted:color-mix(in srgb,#000040 62%,#E8E8B7);
+    --line:color-mix(in srgb,#000040 14%,#E8E8B7);
+    --font:"Onest",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  html{background:var(--cream)}
+  body{font-family:var(--font);color:var(--navy);background:var(--cream);min-height:100vh;
+       -webkit-font-smoothing:antialiased;padding:56px 24px 80px}
+  .wrap{max-width:1040px;margin:0 auto}
+
+  /* hero */
+  header{text-align:center}
+  h1{font-weight:400;font-size:clamp(48px,8vw,92px);line-height:1;letter-spacing:-.045em}
+  h1 em{font-style:italic;font-weight:300}
+  .sub{margin:22px auto 0;max-width:440px;color:var(--muted);font-size:17px;line-height:1.5;font-weight:400}
+
+  /* input bar (sits where the monthly / yearly toggle sits) */
+  .bar{margin:40px auto 0;max-width:760px;background:var(--surface);border-radius:20px;padding:14px;
+       display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;
+       box-shadow:0 8px 28px color-mix(in srgb,#000040 9%,transparent)}
+  .field{display:flex;flex-direction:column;gap:6px;text-align:left}
+  .field label span{color:var(--navy);font-weight:500;margin-left:4px}
+  .field label{font-size:13px;color:var(--muted);padding-left:4px}
+  .field input{font:inherit;font-size:16px;color:var(--navy);background:var(--cream);border:1.5px solid transparent;
+       border-radius:12px;padding:14px 16px;outline:none;transition:border-color .15s,background .15s}
+  .field input::placeholder{color:color-mix(in srgb,#000040 42%,#E8E8B7)}
+  .field input:focus-visible{border-color:var(--navy);background:var(--surface)}
+  button.run{font:inherit;font-weight:500;font-size:17px;color:var(--cream);background:var(--navy);border:0;
+       border-radius:12px;padding:15px 30px;cursor:pointer;outline:2px solid var(--cream);
+       box-shadow:0 0 0 4px var(--navy);margin:4px;transition:transform .12s}
+  button.run:hover{transform:translateY(-1px)}
+  button.run:active{transform:translateY(1px)}
+  button.run:focus-visible{outline-offset:3px}
+  button.run[disabled]{opacity:.6;cursor:progress}
+  .hint{margin-top:12px;font-size:14px;color:var(--muted);min-height:20px}
+  .hint.err{color:var(--navy);font-weight:500}
+
+  /* race track */
+  h2{font-weight:400;font-size:clamp(30px,4vw,44px);letter-spacing:-.035em;margin:72px 0 6px}
+  .lead{color:var(--muted);font-size:16px;margin-bottom:22px;max-width:560px}
+  .card{background:var(--surface);border-radius:22px;padding:22px;
+        box-shadow:0 8px 28px color-mix(in srgb,#000040 9%,transparent)}
+  .track-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .legend{display:flex;gap:20px;flex-wrap:wrap;font-size:14px}
+  .legend span{display:flex;align-items:center;gap:8px}
+  .legend svg{width:34px;height:8px;overflow:visible}
+  .seg{display:inline-flex;background:var(--cream);border-radius:999px;padding:3px}
+  .seg button{font:inherit;font-size:14px;border:0;background:transparent;color:var(--muted);padding:7px 16px;border-radius:999px;cursor:pointer}
+  .seg button[aria-pressed=true]{background:var(--navy);color:var(--cream)}
+  .seg button:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+  .big{position:relative;height:400px}
+
+  /* model cards (same anatomy as the pricing boxes) */
+  .models{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:auto 1fr auto;gap:0 20px;margin-top:20px}
+  .model{background:var(--panel);border-radius:22px;padding:0 0 14px;overflow:hidden;display:grid;grid-template-rows:subgrid;grid-row:span 3}
+  .model .top{background:var(--surface);border-radius:22px;padding:22px 22px 20px;
+        box-shadow:0 8px 28px color-mix(in srgb,#000040 9%,transparent)}
+  .top{display:flex;flex-direction:column}
+  .row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex:1}
+  .row p{font-size:17px;line-height:1.3;color:var(--muted);font-weight:400}
+  .row p b{display:block;color:var(--navy);font-weight:500}
+  .tag{font-size:15px;color:var(--muted);white-space:nowrap}
+  .count{display:flex;justify-content:space-between;align-items:flex-end;margin-top:26px;gap:10px}
+  .count .num{font-size:46px;font-weight:500;letter-spacing:-.04em;line-height:1}
+  .count .num small{font-size:15px;font-weight:400;letter-spacing:0;color:var(--muted);margin-left:6px}
+  .count .side{text-align:right;font-size:15px;font-weight:500;line-height:1.2}
+  .count .side small{display:block;font-weight:400;font-size:11px;color:var(--muted)}
+  .chip{display:inline-block;margin-top:20px;font-size:15px;font-weight:500;color:var(--cream);background:var(--navy);
+        border-radius:10px;padding:9px 18px;outline:2px solid var(--cream);box-shadow:0 0 0 3px var(--navy)}
+  .mini{position:relative;height:190px;margin:16px 18px 0}
+  .verdict{margin:10px 24px 0;font-size:14px;color:var(--muted)}
+
+  /* table */
+  .tablecard{margin-top:20px;padding:10px 22px 14px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:15px;min-width:560px}
+  th,td{text-align:right;padding:13px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  th{font-weight:400;color:var(--muted);font-size:14px}
+  th:first-child,td:first-child{text-align:left}
+  tr:last-child td{border-bottom:0}
+  td:first-child{font-weight:500}
+  td .ok{font-weight:500}
+  td .no{color:var(--muted)}
+  .best td:first-child::after{content:"fastest";margin-left:10px;font-size:12px;font-weight:500;color:var(--cream);background:var(--navy);padding:3px 9px;border-radius:999px}
+
+  @media (max-width:860px){
+    .models{grid-template-columns:1fr;grid-template-rows:none;gap:20px}
+    .model{display:block;grid-row:auto}
+    .bar{grid-template-columns:1fr}
+    button.run{width:calc(100% - 8px)}
+    .big{height:320px}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>IShow<em>Speed</em></h1>
+  <p class="sub">Automata-Based Time Complexity Simulator</p>
+
+  <div class="bar" role="search">
+    <div class="field">
+      <label for="str">Input string <span id="len">· 19 characters</span></label>
+      <input id="str" type="text" maxlength="100" placeholder="e.g. racecarlevelracecar" value="racecarlevelracecar" autocomplete="off" spellcheck="false">
+    </div>
+    <button class="run" id="run" type="button">Run Analysis</button>
+  </div>
+  <p class="hint" id="hint" aria-live="polite">Strings up to 100 characters. The length goes to all three machines at once.</p>
+</header>
+
+<h2>The Race Track</h2>
+<p class="lead">Your string’s length is fed to all three machines at once. Each one runs at every length from 1 up to n, and every elementary move counts as one step.</p>
+
+<section class="card" aria-label="Steps versus input length for all three machines">
+  <div class="track-head">
+    <div class="legend" id="legend"></div>
+    <div class="seg" role="group" aria-label="Y axis scale">
+      <button type="button" data-scale="linear" aria-pressed="true">Linear</button>
+      <button type="button" data-scale="logarithmic" aria-pressed="false">Log</button>
+    </div>
+  </div>
+  <div class="big"><canvas id="bigChart" role="img" aria-label="Line chart of steps against input length for the DFA, PDA and Turing machine"></canvas></div>
+</section>
+
+<section class="models" id="models"></section>
+
+<h2>Step counts</h2>
+<p class="lead">Exact steps each machine took at selected input lengths.</p>
+<section class="card tablecard">
+  <table id="table"><thead></thead><tbody></tbody></table>
+</section>
+
+</div>
+
+<script>
+const NAVY="#000040", CREAM="#E8E8B7";
+const mix=(a)=>`rgba(0,0,64,${a})`;
+const MODELS=[
+  {key:"DFA", name:"Deterministic Finite Automaton", blurb:"Reads one symbol per move", dash:[],      width:3,   alpha:1,   claim:"O(n)"},
+  {key:"PDA", name:"Turing Machine", blurb:"Zig-zags across a single tape", dash:[10,6], width:3,   alpha:.8,  claim:"O(n²)"},
+  {key:"TM",  name:"Non-Deterministic Pushdown Automaton", blurb:"Pushes a half, pops to compare",  dash:[2,5],  width:3.5, alpha:.55, claim:"O(n³)"}
+];
+Chart.defaults.font.family='"Onest",system-ui,sans-serif';
+Chart.defaults.color=NAVY;
+
+let big, minis={}, scale="linear", last=null;
+const fmt=n=>n.toLocaleString("en-US");
+
+// legend
+document.getElementById("legend").innerHTML=MODELS.map(m=>
+ `<span><svg viewBox="0 0 34 8"><line x1="0" y1="4" x2="34" y2="4" stroke="${mix(m.alpha)}" stroke-width="3" stroke-dasharray="${m.dash.join(' ')}" stroke-linecap="round"/></svg>${m.key}</span>`).join("");
+
+// model cards
+document.getElementById("models").innerHTML=MODELS.map(m=>`
+ <article class="model" id="card-${m.key}">
+  <div class="top">
+    <div class="row"><p>${m.blurb}<b>${m.name}</b></p><span class="tag">${m.key}</span></div>
+    <div class="count"><div class="num"><span data-steps>0</span><small>steps</small></div>
+      <div class="side"><span data-n>0</span> symbols<small data-task>&nbsp;</small></div></div>
+    <span class="chip" data-fit>O(n)</span>
+  </div>
+  <div class="mini"><canvas id="mini-${m.key}" role="img" aria-label="${m.key} measured steps against O(n), O(n squared) and O(n cubed) reference curves"></canvas></div>
+  <p class="verdict" data-verdict>&nbsp;</p>
+ </article>`).join("");
+
+function gridOpts(type){
+  return {color:mix(.1),drawTicks:false};
+}
+
+function makeBig(){
+  big=new Chart(document.getElementById("bigChart"),{
+    type:"line",
+    data:{labels:[],datasets:MODELS.map(m=>({label:m.key,data:[],borderColor:mix(m.alpha),borderDash:m.dash,borderWidth:m.width,
+        pointRadius:0,pointHoverRadius:5,pointHoverBackgroundColor:NAVY,tension:.25}))},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:500},interaction:{mode:"index",intersect:false},
+      plugins:{legend:{display:false},
+        tooltip:{backgroundColor:NAVY,titleColor:CREAM,bodyColor:CREAM,padding:12,cornerRadius:10,
+          callbacks:{title:i=>"Input length "+i[0].label,label:c=>` ${c.dataset.label}: ${fmt(c.parsed.y)} steps`}}},
+      scales:{x:{title:{display:true,text:"Input length (n)"},grid:{display:false}},
+              y:{type:"linear",title:{display:true,text:"Steps"},grid:gridOpts(),border:{display:false},
+                 afterBuildTicks:axis=>{ if(axis.type!=="logarithmic") return;   // log view: one tick per power of ten, evenly spaced
+                   axis.ticks=axis.ticks.filter(t=>{const l=Math.log10(t.value);return Math.abs(l-Math.round(l))<1e-9}) },
+                 ticks:{callback:v=>v>=1000?(v/1000)+"k":v}}}}
+  });
+}
+
+function makeMini(m){
+  const refs=[["O(n)",1],["O(n²)",2],["O(n³)",3]];
+  const alphas=[.28,.28,.28], dashes=[[],[6,4],[1,4]];
+  const ds=[{label:"Measured",data:[],borderColor:NAVY,borderWidth:3,pointRadius:0,tension:.25,order:0}];
+  refs.forEach((r,i)=>ds.push({label:r[0],data:[],borderColor:mix(.38),borderDash:dashes[i],borderWidth:1.6,pointRadius:0,tension:.25,order:i+1}));
+  minis[m.key]=new Chart(document.getElementById("mini-"+m.key),{
+    type:"line",data:{labels:[],datasets:ds},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:500},
+      plugins:{legend:{display:true,position:"bottom",labels:{boxWidth:22,boxHeight:2,font:{size:11},padding:10,usePointStyle:false}},
+        tooltip:{backgroundColor:NAVY,titleColor:CREAM,bodyColor:CREAM,callbacks:{title:i=>"n = "+i[0].label,label:c=>` ${c.dataset.label}: ${fmt(Math.round(c.parsed.y))}`}}},
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:5,font:{size:11}}},
+              y:{grid:gridOpts(),border:{display:false},ticks:{maxTicksLimit:4,font:{size:11},callback:v=>v>=1000?(v/1000)+"k":v}}}}
+  });
+}
+
+// least-squares slope of log(steps) vs log(n): ~1 linear, ~2 quadratic, ~3 cubic
+function slope(ns,ys){
+  const pts=ns.map((n,i)=>[Math.log(n),Math.log(Math.max(ys[i],1))]).filter((_,i)=>ns[i]>=4);
+  if(pts.length<2) return null;
+  const mx=pts.reduce((a,p)=>a+p[0],0)/pts.length, my=pts.reduce((a,p)=>a+p[1],0)/pts.length;
+  let num=0,den=0; pts.forEach(p=>{num+=(p[0]-mx)*(p[1]-my);den+=(p[0]-mx)**2});
+  return den? num/den : null;
+}
+const klass=s=>s===null?"–":["O(n)","O(n²)","O(n³)"][Math.min(2,Math.max(0,Math.round(s)-1))];
+
+function render(d){
+  last=d;
+  const ns=d.lengths;
+  // big chart
+  big.data.labels=ns;
+  MODELS.forEach((m,i)=>big.data.datasets[i].data=d.series[m.key]);
+  big.options.scales.y.type=scale;
+  big.update();
+
+  // per-model cards
+  const slopes={};
+  MODELS.forEach(m=>{
+    const ys=d.series[m.key], fin=ys[ys.length-1], n=d.n;
+    slopes[m.key]=slope(ns,ys);
+    const card=document.getElementById("card-"+m.key);
+    card.querySelector("[data-steps]").textContent=fmt(d.final[m.key].steps);
+    card.querySelector("[data-n]").textContent=n;
+    card.querySelector("[data-task]").textContent=d.task[m.key];
+    card.querySelector("[data-fit]").textContent=klass(slopes[m.key]);
+    card.querySelector("[data-verdict]").textContent=
+      "Measured growth ≈ n^"+(slopes[m.key]===null?"–":slopes[m.key].toFixed(2));
+    const c=minis[m.key];
+    c.data.labels=ns;
+    c.data.datasets[0].data=ys;
+    [1,2,3].forEach(k=>c.data.datasets[k].data=ns.map(x=>fin*Math.pow(x/n,k)));  // references meet the measured value at n
+    c.update();
+  });
+
+  // table with up to 5 evenly spaced checkpoints
+  const n=d.n, cps=[...new Set([1,2,3,4,5].map(i=>Math.max(1,Math.round(n*i/5))))];
+  document.querySelector("#table thead").innerHTML=
+    `<tr><th>Machine</th>${cps.map(c=>`<th>n = ${c}</th>`).join("")}<th>Growth</th></tr>`;
+  const fastest=MODELS.reduce((a,m)=>d.final[m.key].steps<d.final[a.key].steps?m:a,MODELS[0]).key;
+  document.querySelector("#table tbody").innerHTML=MODELS.map(m=>
+    `<tr class="${m.key===fastest?'best':''}"><td>${m.key}</td>
+      ${cps.map(c=>`<td>${fmt(d.series[m.key][c-1])}</td>`).join("")}
+      <td>${klass(slopes[m.key])}</td></tr>`).join("");
+}
+
+
+// Preview only: JS port of app.py so the page runs without the Flask backend.
+function runDFA(n){return n}
+function runPDA(n){const s="a".repeat(n);let steps=0;
+  for(let k=0;k<=n;k++)for(const skip of [0,1]){if(k+skip>n)continue;
+    const st=[];for(let i=0;i<k;i++){st.push(s[i]);steps++}
+    steps++;let pos=k+skip;if(skip)steps++;
+    while(pos<n){steps++;if(!st.length||st.pop()!==s[pos])break;pos++}}
+  return steps}
+function runTM(n){if(!n)return 1;let head=0,steps=0;
+  for(let c=0;c<2*n-1;c++){steps++;let l,r;
+    if(c%2===0){l=(c/2)-1;r=(c/2)+1}else{l=(c-1)/2;r=(c-1)/2+1}
+    while(l>=0||r<n){const lc=Math.max(l,0),rc=Math.min(r,n-1);
+      steps+=Math.abs(head-lc);head=lc;steps++;
+      steps+=Math.abs(head-rc);head=rc;steps++;l--;r++}
+    steps+=head;head=0}
+  return steps}
+function localRun(s){const n=s.length,L=[],D=[],P=[],T=[];
+  for(let k=1;k<=n;k++){L.push(k);D.push(runDFA(k));P.push(runPDA(k));T.push(runTM(k))}
+  return {n,lengths:L,series:{DFA:D,PDA:P,TM:T},
+    final:{DFA:{steps:D[n-1]},PDA:{steps:P[n-1]},TM:{steps:T[n-1]}},
+    task:{DFA:"scans every symbol",PDA:"tries every midpoint",TM:"checks every centre"}}}
+async function run(){
+  const btn=document.getElementById("run"), hint=document.getElementById("hint");
+  const string=document.getElementById("str").value;
+  hint.classList.remove("err");
+  if(!string.trim()){hint.textContent="Enter a string to run the race.";hint.classList.add("err");return}
+  btn.disabled=true; btn.textContent="Running…";
+  try{
+    const d=localRun(string.slice(0,100));
+    render(d);
+    hint.textContent=`Fed length ${d.n} to all three machines.`;
+  }catch(e){
+    hint.textContent="Can’t reach the Python backend. Start it with python app.py, then reload.";hint.classList.add("err");
+  }finally{btn.disabled=false;btn.textContent="Run Analysis"}
+}
+
+document.querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{
+  scale=b.dataset.scale;
+  document.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  big.options.scales.y.type=scale; big.update();
+}));
+document.getElementById("run").addEventListener("click",run);
+const strEl=document.getElementById("str"), lenEl=document.getElementById("len");
+const showLen=()=>{const n=strEl.value.length;lenEl.textContent="· "+n+(n===1?" character":" characters")};
+strEl.addEventListener("input",showLen);
+strEl.addEventListener("keydown",e=>{if(e.key==="Enter")run()});
+showLen();
+
+makeBig(); MODELS.forEach(makeMini); run();
+</script>
+</body>
+</html>

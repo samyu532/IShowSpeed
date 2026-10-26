@@ -1,5 +1,5 @@
 # IShowSpeed
-<<<<<<< HEAD
+
 
 **Automata-Based Time Complexity Simulator**
 

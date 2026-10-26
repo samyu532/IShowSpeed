@@ -36,7 +36,7 @@ IShowSpeed/
 Requires Python 3.9 or newer.
 
 ```bash
-git clone <your-repo-url>
+git clone <https://github.com/samyu532/IShowSpeed.git>
 cd IShowSpeed
 pip install -r requirements.txt
 python app.py
